@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../provider/home_provider.dart';
+import '../provider/upload_provider.dart';
 import 'camera_screen.dart';
 
 class HomePage extends StatefulWidget {
@@ -25,7 +26,11 @@ class _HomePageState extends State<HomePage> {
         actions: [
           IconButton(
             onPressed: () => _onUpload(),
-            icon: const Icon(Icons.upload),
+            icon: context.watch<UploadProvider>().isUploading
+                ? const CircularProgressIndicator(
+                    color: Colors.white,
+                  )
+                : const Icon(Icons.upload),
             tooltip: "Unggah",
           ),
         ],
@@ -72,7 +77,35 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  _onUpload() async {}
+  _onUpload() async {
+    final homeProvider = context.read<HomeProvider>();
+    final uploadProvider = context.read<UploadProvider>();
+
+    final ScaffoldMessengerState scaffoldMessengerState =
+    ScaffoldMessenger.of(context);
+
+    final imagePath = homeProvider.imagePath;
+    final imageFile = homeProvider.imageFile;
+    if (imagePath == null || imageFile == null) return;
+    final fileName = imageFile.name;
+    final bytes = await imageFile.readAsBytes();
+    final newBytes = await uploadProvider.compressImage(bytes);
+
+    await uploadProvider.upload(
+      newBytes,
+      fileName,
+      "Ini adalah deskripsi gambar",
+    );
+
+    if (uploadProvider.uploadResponse != null) {
+      homeProvider.setImageFile(null);
+      homeProvider.setImagePath(null);
+    }
+
+    scaffoldMessengerState.showSnackBar(
+      SnackBar(content: Text(uploadProvider.message)),
+    );
+  }
 
   _onGalleryView() async {
     final provider = context.read<HomeProvider>();
@@ -125,7 +158,7 @@ class _HomePageState extends State<HomePage> {
       ),
     );
 
-    if(resultImageFile != null) {
+    if (resultImageFile != null) {
       provider.setImageFile(resultImageFile);
       provider.setImagePath(resultImageFile.path);
     }
